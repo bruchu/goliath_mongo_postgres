@@ -1,0 +1,4 @@
+quick test of em_postgres:
+
+% activerecord/pg.rb -s
+% curl 'http://localhost:9000/index.html?id=1'

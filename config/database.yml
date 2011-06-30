@@ -1,0 +1,22 @@
+base: &base
+  adapter: em_postgresql
+  host: localhost
+  port: 5432
+  username: <%= ENV['DBUSER'] || ENV['USER'] || "zambosa" %>
+  password: <%= ENV['DBPASS'] || "" %>
+
+development:
+  <<: *base
+  database: zambosa_dev
+
+production:
+  <<: *base
+  database: zambosa_prod
+
+staging:
+  <<: *base
+  database: zambosa_staging
+
+test:
+  <<: *base
+  database: zambosa_test

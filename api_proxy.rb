@@ -10,9 +10,20 @@ require 'em-mongo'
 # require 'em-http'
 require 'em-synchrony/em-http'
 require 'yajl/json_gem'
+require 'active_record'
 
 require 'goliath/synchrony/mongo_receiver'            # has the aroundware logic for talking to mongodb
 require File.join(File.dirname(__FILE__), 'http_log') # Use the HttpLog as our actual endpoint, but include this in the middleware
+
+require 'postgres-pr/postgres-compat'
+
+class PGresult
+  alias :nfields :num_fields
+  alias :ntuples :num_tuples
+  alias :ftype :type
+end
+
+
 
 # Usage:
 #
@@ -46,7 +57,7 @@ require File.join(File.dirname(__FILE__), 'http_log') # Use the HttpLog as our a
 # POST/PUT/DELETE requests differently.
 #
 #
-class AuthReceiver < Goliath::Synchrony::MongoReceiver
+class AuthReceiver
   include Goliath::Validation
   include Goliath::Rack::Validator
   attr_accessor :account_info, :usage_info
@@ -60,6 +71,7 @@ class AuthReceiver < Goliath::Synchrony::MongoReceiver
 
   def pre_process
     validate_apikey!
+    Parntners.
     first('AccountInfo', { :_id => apikey   }){|res| self.account_info = res }
     first('UsageInfo',   { :_id => usage_id }){|res| self.usage_info   = res }
     env.trace('pre_process_end')
@@ -120,8 +132,8 @@ class AuthReceiver < Goliath::Synchrony::MongoReceiver
 
   # ===========================================================================
 
-  def apikey
-    env.params['_apikey']
+  def partner
+    Partner.find(env.params['app_id'])
   end
 
   def usage_id
@@ -141,8 +153,26 @@ class AuthReceiver < Goliath::Synchrony::MongoReceiver
   end
 end
 
-class AuthAndRateLimit < HttpLog
-  use Goliath::Rack::Tracer, 'X-Tracer'
-  use Goliath::Rack::Params             # parse & merge query and body parameters
-  use Goliath::Rack::AsyncAroundware, AuthReceiver, 'api_auth_db'
+class Being < ActiveRecord::Base
 end
+
+class ApiProxy < HttpLog
+  use Goliath::Rack::Params             # parse & merge query and body parameters
+  use Goliath::Rack::DefaultMimeType
+  use Goliath::Rack::Formatters::JSON
+  use Goliath::Rack::Render
+
+  use Goliath::Rack::Tracer, 'X-Tracer'
+  use Goliath::Rack::AsyncAroundware, AuthReceiver
+
+  def response(env)
+    #User.find_by_sql("SELECT PG_SLEEP(10)")
+    [200, {}, Being.first]
+  end
+  
+end
+
+
+
+
+
