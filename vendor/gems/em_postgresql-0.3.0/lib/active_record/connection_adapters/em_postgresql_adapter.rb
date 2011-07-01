@@ -2,7 +2,7 @@ require 'postgres_connection'
 
 require 'active_record'
 require 'active_record/connection_adapters/postgresql_adapter'
-require 'active_record/patches'
+require 'active_record/fiber_patches'
 
 if !PGconn.respond_to?(:quote_ident)
   def PGconn.quote_ident(name)
@@ -35,25 +35,27 @@ module ActiveRecord
         @logger.info "Connecting to #{@hostname}:#{@port}"
         @connection = ::EM.connect(@hostname, @port, ::EM::P::PostgresConnection)
 
-        fiber = Fiber.current
-        yielding = true
-        result = false
-        message = nil
-        task = @connection.connect(*@connect_parameters)
-        task.callback do |rc, msg|
-          result = rc
-          message = msg
-          fiber.resume
-        end
-        task.errback do |msg|
+        #fiber = Fiber.current
+        fiber = Fiber.new { |f|
+          yielding = true
           result = false
-          message = msg
-          yielding = false
-        end
-        Fiber.yield if yielding
-
-        raise RuntimeError, "Connection failed: #{message}" if !result
+          message = nil
+          task = @connection.connect(*@connect_parameters)
+          task.callback do |rc, msg|
+            result = rc
+            message = msg
+            f.resume
+          end
+          task.errback do |msg|
+            result = false
+            message = msg
+            yielding = false
+          end
+          Fiber.yield if yielding
+          raise RuntimeError, "Connection failed: #{message}" if !result
+        }
         
+          
         # Use escape string syntax if available. We cannot do this lazily when encountering
         # the first string, because that could then break any transactions in progress.
         # See: http://www.postgresql.org/docs/current/static/runtime-config-compatible.html

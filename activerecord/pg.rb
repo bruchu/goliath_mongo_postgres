@@ -12,11 +12,16 @@
 $: << "../../lib" << "./lib"
 
 require 'bundler/setup'
+
 require 'goliath'
 require 'active_record'
 require 'yajl'
+require 'pg'
 
-require 'pg_patches'
+# require 'pg_patches'
+
+class Being < ActiveRecord::Base
+end
 
 class User < ActiveRecord::Base
 end
@@ -32,6 +37,7 @@ class Pg < Goliath::API
 
   def response(env)
     #User.find_by_sql("SELECT PG_SLEEP(10)")
-    [200, {}, User.find(params['id'])]
+    [200, {}, Being.find(params['id'])]
+    #[200, {}, User.find(params['id'])]
   end
 end

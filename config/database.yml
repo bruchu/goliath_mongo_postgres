@@ -1,13 +1,19 @@
+# for some reason, <<: *base is not working
+
 base: &base
-  adapter: em_postgresql
+  #adapter: em_postgresql
   host: localhost
-  port: 5432
   username: <%= ENV['DBUSER'] || ENV['USER'] || "zambosa" %>
   password: <%= ENV['DBPASS'] || "" %>
-
+  
 development:
-  <<: *base
+  adapter: em_postgresql
+  host: localhost
+  username: <%= ENV['DBUSER'] || ENV['USER'] || "zambosa" %>
+  password: <%= ENV['DBPASS'] || "" %>
   database: zambosa_dev
+  #pool: 20
+  wait_timeout: 0.25
 
 production:
   <<: *base

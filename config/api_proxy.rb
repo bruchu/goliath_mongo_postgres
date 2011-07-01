@@ -1,43 +1,43 @@
-require 'postgres-pr/postgres-compat'
+#require 'postgres-pr/postgres-compat'
+#require 'active_record/connection_adapters/em_pg_adapter'
 
-import 'http_log'
+import 'http_log' # pull in config/http_log.rb
+
+require 'erb'
+require 'yaml'
 
 RAILS_ENV = Goliath.env
 
-config['horoscope_db'] = EventMachine::Synchrony::ConnectionPool.new(:size => 20) do
+config['mongo_auth_db'] = EventMachine::Synchrony::ConnectionPool.new(:size => 20) do
   conn = EM::Mongo::Connection.new('localhost', 27017, 1, {:reconnect_in => 1})
   conn.db("zambosa_#{ Goliath.env}")
 end
 
-# environment(:development) do
-
-
-#   # for demo purposes, some dummy accounts
-#   timebin = ((Time.now.to_i / 3600).floor * 3600)
-
-#   # This user's calls should all go through
-#   config['api_auth_db'].collection('AccountInfo').save({
-#       :_id => 'i_am_awesome', 'valid' => true,  'max_call_rate' => 1_000_000 })
-
-#   # this user's account is disabled
-#   config['api_auth_db'].collection('AccountInfo').save({
-#       :_id => 'i_am_lame',    'valid' => false, 'max_call_rate' => 1_000 })
-
-#   # this user has not been seen, but will very quickly hit their limit
-#   config['api_auth_db'].collection('AccountInfo').save({
-#       :_id => 'i_am_limited', 'valid' => true, 'max_call_rate' =>     10 })
-
-#   # fakes a user with a bunch of calls already made this hour -- two more = no yuo
-#   config['api_auth_db'].collection('AccountInfo').save({
-#       :_id => 'i_am_busy',    'valid' => true, 'max_call_rate' =>  1_000 })
-#   config['api_auth_db'].collection('UsageInfo').save({
-#       :_id => "i_am_busy-#{timebin}", 'calls' =>  999 })
-# end
+#require 'rack/fiber_pool'
+require 'active_record'
+require 'active_record/connection_adapters/abstract_adapter'
+require 'active_record/connection_adapters/em_postgresql_adapter'
 
 filename = File.join(File.dirname(__FILE__), 'config', 'database.yml')
+puts filename
+#ActiveRecord::Base.configurations = YAML::load(File.open(filename))
 ActiveRecord::Base.configurations = YAML::load(ERB.new(File.read(filename)).result)
-#puts ActiveRecord::Base.configurations[Goliath.env.to_s]
+puts ActiveRecord::Base.configurations[Goliath.env.to_s]
+
 ActiveRecord::Base.default_timezone = :utc
 ActiveRecord::Base.logger = logger
 #ActiveRecord::Base.time_zone_aware_attributes = true
+# ActiveRecord::ConnectionAdapters::ConnectionPool.new(Struct.new(:config).new({})) do
+#   conn = ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[Goliath.env.to_s])
+# end
+
 ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[Goliath.env.to_s])
+#   :adapter  => 'em_postgresql',
+# #  :adapter  => 'neverblock_postresql',
+#   :database => 'zambosa_dev',
+#   :username => 'chub',
+#   :password => 'chub',
+#   :host     => 'localhost')
+
+#  ActiveRecord::Base.configurations[Goliath.env.to_s])
+#puts 'connected?=', ActiveRecord::Base.connected?

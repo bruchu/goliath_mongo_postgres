@@ -2,28 +2,22 @@
 
 $: << "./config"
 
+require 'pp'
 require 'boot'
 require 'setup_load_paths'
 
 require 'goliath'
 require 'em-mongo'
-# require 'em-http'
+require 'em-http'
 require 'em-synchrony/em-http'
 require 'yajl/json_gem'
 require 'active_record'
 
-require 'goliath/synchrony/mongo_receiver'            # has the aroundware logic for talking to mongodb
+require 'goliath/synchrony/response_receiver'
 require File.join(File.dirname(__FILE__), 'http_log') # Use the HttpLog as our actual endpoint, but include this in the middleware
 
-require 'postgres-pr/postgres-compat'
-
-class PGresult
-  alias :nfields :num_fields
-  alias :ntuples :num_tuples
-  alias :ftype :type
-end
-
-
+#require 'pg_patches'
+require 'zambosa_signature'
 
 # Usage:
 #
@@ -57,10 +51,10 @@ end
 # POST/PUT/DELETE requests differently.
 #
 #
-class AuthReceiver
+class AuthReceiver # < Goliath::Synchrony::MultiReceiver
   include Goliath::Validation
   include Goliath::Rack::Validator
-  attr_accessor :account_info, :usage_info
+  attr_accessor :partner, :usage_info
 
   # time period to aggregate stats over, in seconds
   TIMEBIN_SIZE = 60 * 60
@@ -69,18 +63,36 @@ class AuthReceiver
   class RateLimitExceededError < ForbiddenError    ; end
   class InvalidApikeyError     < UnauthorizedError ; end
 
+  def initialize(env, db_name)
+    @env = env
+    @db = env.config[db_name]
+  end
+
+  def db
+    @db
+  end
+  
   def pre_process
-    validate_apikey!
-    Parntners.
-    first('AccountInfo', { :_id => apikey   }){|res| self.account_info = res }
+    self.partner = Partner.find_by_key(env.params['app'])
+    db.collection("UsageInfo").find({ :_id => self.usage_id }, :limit => 1) do |result|
+      self.usage_info = result
+    end
+
+    # charge_usage
+    db.collection('UsageInfo').update({ :_id => self.usage_id },
+      { '$inc' => { :calls   => 1 } }, :upsert => true)
+
+    puts self.partner.inspect
+    puts self.usage_info.inspect
+
     first('UsageInfo',   { :_id => usage_id }){|res| self.usage_info   = res }
     env.trace('pre_process_end')
   end
 
   def post_process
     env.trace('post_process_beg')
-    env.logger.info [account_info, usage_info].inspect
-    self.account_info ||= {}
+    env.logger.info [partner, usage_info].inspect
+    self.partner ||= {}
     self.usage_info   ||= {}
 
     inject_headers
@@ -90,7 +102,7 @@ class AuthReceiver
     end
 
     safely(env, headers) do
-      check_apikey!
+      check_signature!
       check_rate_limit!
 
       env.trace('post_process_end')
@@ -100,20 +112,57 @@ class AuthReceiver
 
   # ===========================================================================
 
-  def validate_apikey!
-    if apikey.to_s.empty?
+  def validate_app_key!
+    if env.params['app'].to_s.empty?
+      raise MissingApikeyError
+    end
+
+    self.partner = EM.synchrony do
+      ActiveRecord::Base.establish_connection(
+          :adapter  => 'em_postgresql',
+          :database => 'zambosa_dev',
+          :username => 'chub',
+          :password => 'chub',
+          :host     => 'localhost')
+      #Partner.find_by_key(env.params['app'])
+      Fiber.yield Partner.find_by_key(env.params['app'])
+      #Fiber.yield(p)
+    end
+
+    puts self.partner.inspect
+    #puts f.resume.inspect
+
+    #puts Being.find(env.params['id']).inspect
+    #puts Partner.find_by_key(env.params['app']).inspect
+    #end
+    #puts 'partner=', self.partner
+#       Fiber.new {
+#         ActiveRecord::Base.establish_connection(
+#   :adapter  => 'em_postgresql',
+# #  :adapter  => 'neverblock_postresql',
+#   :database => 'zambosa_dev',
+#   :username => 'chub',
+#   :password => 'chub',
+#   :host     => 'localhost')
+#         puts Being.find(env.params['id']).inspect
+#         yield Partner.find_by_key(env.params['app'])
+#       }.resume
+#     }
+    puts 'partner=%s' % self.partner.inspect
+    unless self.partner
       raise MissingApikeyError
     end
   end
 
-  def check_apikey!
-    unless account_info['valid'] == true
+  def check_signature!
+    puts self.partner.inspect
+    unless self.partner.valid == true
       raise InvalidApikeyError
     end
   end
 
   def check_rate_limit!
-    return true if usage_info['calls'].to_f <= account_info['max_call_rate'].to_f
+    return true if usage_info['calls'].to_f <= partner['max_call_rate'].to_f
     raise RateLimitExceededError
   end
 
@@ -124,7 +173,7 @@ class AuthReceiver
 
   def inject_headers
     headers.merge!({
-        'X-RateLimit-MaxRequests' => account_info['max_call_rate'].to_s,
+        'X-RateLimit-MaxRequests' => partner['max_call_rate'].to_s,
         'X-RateLimit-Requests'    => usage_info['calls'].to_s,
         'X-RateLimit-Reset'       => timebin_end.to_s,
       })
@@ -132,12 +181,8 @@ class AuthReceiver
 
   # ===========================================================================
 
-  def partner
-    Partner.find(env.params['app_id'])
-  end
-
   def usage_id
-    "#{apikey}-#{timebin}"
+    "#{ self.partner.id }-#{timebin}"
   end
 
   def timebin
@@ -153,23 +198,80 @@ class AuthReceiver
   end
 end
 
+class Partner < ActiveRecord::Base
+end
+
 class Being < ActiveRecord::Base
 end
 
 class ApiProxy < HttpLog
-  use Goliath::Rack::Params             # parse & merge query and body parameters
-  use Goliath::Rack::DefaultMimeType
-  use Goliath::Rack::Formatters::JSON
-  use Goliath::Rack::Render
-
+  include Goliath::Validation
+  
   use Goliath::Rack::Tracer, 'X-Tracer'
-  use Goliath::Rack::AsyncAroundware, AuthReceiver
+  use Goliath::Rack::Params             # parse & merge query and body parameters
+  #use Goliath::Rack::AsyncAroundware, AuthReceiver, 'mongo_auth_db'
 
-  def response(env)
-    #User.find_by_sql("SELECT PG_SLEEP(10)")
-    [200, {}, Being.first]
+  use Goliath::Rack::Validation::RequestMethod, %w(GET)           # allow GET requests only
+  use Goliath::Rack::Validation::RequiredParam, { :key => 'app' }
+  attr_accessor :usage_info, :partner
+
+  # time period to aggregate stats over, in seconds
+  TIMEBIN_SIZE = 60 * 60
+
+  class MissingApikeyError     < BadRequestError   ; end
+  class RateLimitExceededError < ForbiddenError    ; end
+  class InvalidApikeyError     < UnauthorizedError ; end
+  class InvalidSignatureError     < UnauthorizedError ; end
+
+  def check_signature!(env)
+    puts 'url=%s' % "http://#{ env.HTTP_HOST.downcase }#{ env.REQUEST_URI }"
+    unless ZambosaSignature.verify_url(self.partner.key, self.partner.secret, "http://#{ env.HTTP_HOST.downcase }#{ env.REQUEST_URI }")
+      puts 'invalid signature'
+      raise InvalidSignatureError
+    end
   end
   
+  def response(env)
+    self.partner = Partner.find_by_key(env.params['app'])
+
+    unless self.partner
+      raise InvalidApikeyError
+    end
+
+    #puts env.pretty_inspect
+    check_signature!(env)
+    
+    env.mongo_auth_db.collection("UsageInfo").find({ :_id => self.usage_id }, :limit => 1) do |result|
+      self.usage_info = result
+    end
+
+    # charge_usage
+    env.mongo_auth_db.collection('UsageInfo').update({ :_id => self.usage_id },
+      { '$inc' => { :calls   => 1 } }, :upsert => true)
+
+    puts self.partner.inspect
+    puts self.usage_info.inspect
+
+    
+
+    r = super(env)
+  end
+  # ===========================================================================
+  def usage_id
+    "#{ self.partner.id }-#{timebin}"
+  end
+
+  def timebin
+    @timebin ||= timebin_beg
+  end
+
+  def timebin_beg
+    ((Time.now.to_i / TIMEBIN_SIZE).floor * TIMEBIN_SIZE)
+  end
+
+  def timebin_end
+    timebin_beg + TIMEBIN_SIZE
+  end
 end
 
 

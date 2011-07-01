@@ -39,6 +39,7 @@ module EventMachine
       # Fibered impl for synchronous execution of SQL within EM
       def exec(sql)
         fiber = Fiber.current
+        #fiber = Fiber.new
 #        p [fiber.object_id, self.object_id, sql]
         yielding = true
         (status, result, errors) = nil

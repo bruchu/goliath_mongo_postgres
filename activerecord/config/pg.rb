@@ -1,8 +1,5 @@
 #require 'postgres-pr/message'
-#require 'em_postgresql'
-#require 'pg'
-
-require 'postgres-pr/postgres-compat'
+#require 'postgres-pr/postgres-compat'
 
 # filename = File.join(Rails.root, 'config', 'database.yml')
 # ActiveRecord::Base.configurations = YAML::load(ERB.new(File.read(filename)).result)
@@ -18,8 +15,10 @@ ActiveRecord::Base.default_timezone = :utc
 # use ActiveRecord::ConnectionAdapters::ConnectionManagement
 
 ActiveRecord::Base.logger = logger
-ActiveRecord::Base.establish_connection(:adapter  => 'em_postgresql',
-                                        :database => 'goliath_test',
-                                        :username => 'chub',
+ActiveRecord::Base.establish_connection(
+  :adapter  => 'em_postgresql',
+#  :adapter  => 'neverblock_postresql',
+  :database => 'zambosa_dev',
+  :username => 'chub',
   :password => 'chub',
-                                        :host     => 'localhost')
+  :host     => 'localhost')
