@@ -8,12 +8,13 @@ base: &base
   
 development:
   adapter: em_postgresql
+  post: 5432,
+  pool: 2,
   host: localhost
   username: <%= ENV['DBUSER'] || ENV['USER'] || "zambosa" %>
   password: <%= ENV['DBPASS'] || "" %>
   database: zambosa_dev
-  #pool: 20
-  wait_timeout: 0.25
+  wait_timeout: 2
 
 production:
   <<: *base

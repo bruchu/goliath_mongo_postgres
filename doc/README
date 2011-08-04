@@ -2,3 +2,38 @@ quick test of em_postgres:
 
 % activerecord/pg.rb -s
 % curl 'http://localhost:9000/index.html?id=1'
+
+
+--------
+db_synchrony.rb - eventmachine connections to postgres & mongo
+
+start server:
+% bundle exec ruby  db_synchrony.rb -sv
+
+connect client:
+% telnet localhost 10000
+
+client output:
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+asdf
+>>> you sent: asdf
+asdf
+>>> you sent: asdf
+asdf
+>>> you sent: asdf
+
+server output:
+-- someone connected to the echo server!
+{"_id"=>"test-bucket", "calls"=>148}
+#<Partner id: 2, key: "a", secret: "b", url: "c", name: "b", description: nil, contact_name: nil, email: nil, phone: nil, created_at: nil, updated_at: nil>
+{"_id"=>"test-bucket", "calls"=>149}
+#<Partner id: 2, key: "a", secret: "b", url: "c", name: "b", description: nil, contact_name: nil, email: nil, phone: nil, created_at: nil, updated_at: nil>
+{"_id"=>"test-bucket", "calls"=>150}
+#<Partner id: 2, key: "a", secret: "b", url: "c", name: "b", description: nil, contact_name: nil, email: nil, phone: nil, created_at: nil, updated_at: nil>
+
+------
+standalone.rb - demonstrate that the em_postgresql driver works
+
+% bundle exec ruby standalone.rb -sv
