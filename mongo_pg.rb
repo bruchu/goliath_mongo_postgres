@@ -62,7 +62,7 @@ class MongoPg < Goliath::API
   #use Goliath::Rack::AsyncAroundware, AuthAndRateLimitReceiver, env
 
   TIMEBIN_SIZE = 60 * 60
-  DEFAULT_RATE_LIMIT = 10
+  DEFAULT_RATE_LIMIT = 25
 
   class MissingApikeyError     < BadRequestError   ; end
   class RateLimitExceededError < ForbiddenError    ; end
@@ -83,15 +83,13 @@ class MongoPg < Goliath::API
     params = {:head => env['client-headers'], :query => env.params}
     validate_app_key!
 
-    #self.usage_info = env.mongo.find_one( { :_id => self.usage_id } )
-    rr = env.mongo.first( { :_id => self.usage_id } )
-    rr.callback do |docs|
-      puts 'docs.inspect=%s' % docs if docs
+    # make this call "synchronous"
+    f = Fiber.current
+    env.mongo.first( { :_id => self.usage_id } ).callback do |doc|
+      self.usage_info = doc
+      f.resume
     end
-
-    rr.errback do |err|
-      raise *err
-    end
+    Fiber.yield
     
     check_rate_limit!
     check_signature!
@@ -202,7 +200,7 @@ class MongoPg < Goliath::API
   # ===========================================================================
 
   def usage_id
-    puts "#{ self.partner.id }-#{timebin}"
+    #puts "#{ self.partner.id }-#{timebin}"
     "#{ self.partner.id }-#{timebin}"
   end
 
