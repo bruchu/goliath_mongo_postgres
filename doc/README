@@ -37,3 +37,40 @@ server output:
 standalone.rb - demonstrate that the em_postgresql driver works
 
 % bundle exec ruby standalone.rb -sv
+
+------
+mongo_pg.rb
+
+chub@acute ~/Projects/AnythingSocial/zambosa[rails3*] $ rails runner script/sign_it.rb a b 'http://localhost:9000/horoscope?app=a&birthdate=1971-10-09'
+http://localhost:9000/horoscope?app=a&birthdate=1971-10-09&oauth_signature=t6tKUGaEV0Rv7EYI2FbMDiLQ5MU%3D
+true
+
+# start server
+% bundle exec ruby mongo_pg.rb -sv
+
+# run client
+% curl -v 'http://localhost:9000/horoscope?app=a&birthdate=1971-10-09&oauth_signature=t6tKUGaEV0Rv7EYI2FbMDiLQ5MU%3D'
+
+* About to connect() to localhost port 9000 (#0)
+*   Trying 127.0.0.1... connected
+* Connected to localhost (127.0.0.1) port 9000 (#0)
+> GET /horoscope?app=a&birthdate=1971-10-09&oauth_signature=t6tKUGaEV0Rv7EYI2FbMDiLQ5MU%3D HTTP/1.1
+> User-Agent: curl/7.19.7 (universal-apple-darwin10.0) libcurl/7.19.7 OpenSSL/0.9.8r zlib/1.2.3
+> Host: localhost:9000
+> Accept: */*
+> 
+< HTTP/1.1 200 OK
+< Content-Type: application/json; charset=utf-8
+< Etag: "5dded2c1a66f1ba0f0f2a6d61a598800"
+< Cache-Control: max-age=0, private, must-revalidate
+< X-Ua-Compatible: IE=Edge
+< X-Runtime: 0.521492
+< Server: WEBrick/1.3.1 (Ruby/1.9.2/2011-02-18)
+< Date: Fri, 05 Aug 2011 07:19:45 GMT
+< Content-Length: 281
+< Connection: close
+< 
+* Closing connection #0
+{"reading":"You cannot think clearly today and don't try.","keywords":["communication","transportation","thought","logic","transcendence","imagination","confusion","spirituality"],"facets":[["happiness",100],["love",100],["friendship",100],["luck",100],["money",100],["work",100]]}
+
+

@@ -26,6 +26,8 @@ require "eventmachine"
 require "fiber"
 require 'active_record'
 
+require 'zambosa_signature'
+
 class Partner < ActiveRecord::Base
 end
 
@@ -67,6 +69,7 @@ class MongoPg < Goliath::API
   class MissingApikeyError     < BadRequestError   ; end
   class RateLimitExceededError < ForbiddenError    ; end
   class InvalidApikeyError     < UnauthorizedError ; end
+  class InvalidSignatureError  < UnauthorizedError ; end
   
   attr_accessor :usage_info, :partner
 
@@ -92,7 +95,7 @@ class MongoPg < Goliath::API
     Fiber.yield
     
     check_rate_limit!
-    check_signature!
+    check_signature!(env)
 
     req = EM::HttpRequest.new("#{env.forwarder}#{env[Goliath::Request::REQUEST_PATH]}")
     resp = case(env[Goliath::Request::REQUEST_METHOD])
@@ -111,7 +114,11 @@ class MongoPg < Goliath::API
 
     #record(env, process_time, resp, env['client-headers'], response_headers)
 
-    charge_usage
+    if resp.response_header.status == 200
+      charge_usage
+    else
+      charge_forwarder_failure
+    end
 
     [resp.response_header.status, response_headers, resp.response]
   end
@@ -162,9 +169,15 @@ class MongoPg < Goliath::API
     raise MissingApikeyError unless self.partner
   end
 
-  def check_signature!
+  def check_signature!(env)
     unless self.partner.secret
       raise InvalidApikeyError
+    end
+
+    puts 'url=%s' % "http://#{ env.HTTP_HOST.downcase }#{ env.REQUEST_URI }"
+    unless ZambosaSignature.verify_url(self.partner.key, self.partner.secret, "http://#{ env.HTTP_HOST.downcase }#{ env.REQUEST_URI }")
+      charge_invalid_signature
+      raise InvalidSignatureError
     end
   end
 
@@ -181,21 +194,31 @@ class MongoPg < Goliath::API
   end
 
   def charge_usage
+    charge(:calls => 1)
+  end
+
+  def charge_invalid_signature
+    charge(:invalid_signature => 1)
+  end
+
+  def charge_overlimit
+    charge(:overlimit => 1)
+  end
+
+  def charge_forwarder_failure
+    charge(:forwarder_failure => 1)
+  end
+
+  def charge(inc_options)
     e = env
     EM.next_tick do
-      e.mongo.safe_update({ :_id => usage_id }, { '$inc' => { :calls => 1 } }, :upsert => true)
+      e.mongo.safe_update({ :_id => usage_id }, { '$inc' => inc_options }, :upsert => true)
       e.mongo.find( { :_id => self.usage_id }, :limit => 1 ).limit(1).each do |doc|
         puts doc.inspect if doc
       end
     end
   end
-
-  def charge_overlimit
-    e = env
-    EM.next_tick do
-      e.mongo.safe_update({ :_id => usage_id }, { '$inc' => { :overlimit => 1 } }, :upsert => true)
-    end
-  end
+  
 
   # ===========================================================================
 

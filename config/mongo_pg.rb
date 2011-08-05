@@ -1,4 +1,4 @@
-config['forwarder'] = 'http://localhost:8080'
+config['forwarder'] = 'http://local.zambosa.com:3000/api'
 
 environment(:development) do
   config['mongo'] = EventMachine::Synchrony::ConnectionPool.new(size: 20) do
