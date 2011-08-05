@@ -9,7 +9,7 @@ base: &base
 development:
   adapter: em_postgresql
   post: 5432,
-  pool: 2,
+  pool: 10,
   host: localhost
   username: <%= ENV['DBUSER'] || ENV['USER'] || "zambosa" %>
   password: <%= ENV['DBPASS'] || "" %>
