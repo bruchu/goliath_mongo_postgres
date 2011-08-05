@@ -66,11 +66,29 @@ class MongoPg < Goliath::API
   TIMEBIN_SIZE = 60 * 60
   DEFAULT_RATE_LIMIT = 25
 
-  class MissingApikeyError     < BadRequestError   ; end
-  class RateLimitExceededError < ForbiddenError    ; end
-  class InvalidApikeyError     < UnauthorizedError ; end
-  class InvalidSignatureError  < UnauthorizedError ; end
-  
+  ERRORS = [
+    ["missing api key", BadRequestError],
+    ["rate limit exceeded", ForbiddenError],
+    ["invalid api key", UnauthorizedError],
+    ["invalid signature", UnauthorizedError]
+  ]
+
+  ERRORS.each do |msg, base_klass|
+    klass_name = "#{msg.gsub(/\W+/, '_')}Error".camelize.gsub(/ErrorError$/, "Error")
+    klass = Class.new(base_klass)
+    klass.class_eval(%Q{
+      def initialize
+        super('#{ msg }')
+      end }, __FILE__, __LINE__)
+    self.const_set(klass_name, klass)
+  end
+    
+  # class MissingApikeyError < BadRequestError
+  #   def initialize
+  #     super("missing api key")
+  #   end
+  # end
+
   attr_accessor :usage_info, :partner
 
   def on_headers(env, headers)
@@ -79,6 +97,7 @@ class MongoPg < Goliath::API
   end
 
   def response(env)
+    @timebin = nil
     self.partner = nil
     self.usage_info = nil
     
@@ -97,6 +116,11 @@ class MongoPg < Goliath::API
     check_rate_limit!
     check_signature!(env)
 
+    # code to help testing concurrency
+    # f = Fiber.current  
+    # EventMachine.add_timer 3, proc { f.resume }  
+    # Fiber.yield
+
     req = EM::HttpRequest.new("#{env.forwarder}#{env[Goliath::Request::REQUEST_PATH]}")
     resp = case(env[Goliath::Request::REQUEST_METHOD])
            when 'GET'  then req.get(params)
@@ -112,7 +136,7 @@ class MongoPg < Goliath::API
       response_headers[to_http_header(k)] = v
     end
 
-    #record(env, process_time, resp, env['client-headers'], response_headers)
+    record(env, process_time, resp, env['client-headers'], response_headers)
 
     if resp.response_header.status == 200
       charge_usage
@@ -154,19 +178,20 @@ class MongoPg < Goliath::API
         doc[:request][:body] = e[Goliath::Request::RACK_INPUT].read
       end
 
-      e.mongo.insert(doc)
+      puts doc.inspect
+      #e.mongo.insert(doc)
     end
   end
 
 
   def validate_app_key!
     if env.params['app'].to_s.empty?
-      raise MissingApikeyError
+      raise MissingApiKeyError
     end
 
     self.partner = Partner.find_by_key(env.params['app'])
     puts self.partner.inspect
-    raise MissingApikeyError unless self.partner
+    raise MissingApiKeyError unless self.partner
   end
 
   def check_signature!(env)
