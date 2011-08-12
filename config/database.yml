@@ -1,9 +1,8 @@
 # for some reason, <<: *base is not working
-
 base: &base
   #adapter: em_postgresql
   host: localhost
-  username: <%= ENV['DBUSER'] || ENV['USER'] || "zambosa" %>
+  username: <%= ENV['DBUSER'] || ENV['USER'] || "root" %>
   password: <%= ENV['DBPASS'] || "" %>
   
 development:
@@ -11,19 +10,28 @@ development:
   post: 5432,
   pool: 10,
   host: localhost
-  username: <%= ENV['DBUSER'] || ENV['USER'] || "zambosa" %>
+  username: <%= ENV['DBUSER'] || ENV['USER'] || "root" %>
   password: <%= ENV['DBPASS'] || "" %>
-  database: zambosa_dev
+  database: gmp_development
   wait_timeout: 2
 
 production:
-  <<: *base
-  database: zambosa_prod
+  adapter: em_postgresql
+  post: 5432,
+  pool: 10,
+  host: localhost
+  database: gmp_production
 
 staging:
-  <<: *base
-  database: zambosa_staging
+  adapter: em_postgresql
+  post: 5432,
+  pool: 10,
+  host: localhost
+  database: gmp_staging
 
 test:
-  <<: *base
-  database: zambosa_test
+  adapter: em_postgresql
+  post: 5432,
+  pool: 10,
+  host: localhost
+  database: gmp_test

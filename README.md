@@ -1,4 +1,6 @@
-# Goliath Mongo Postgres Example
+Goliath Mongo Postgres Example
+------------------------------
+
 This is a simple toy example that accesses both mongo and postgres
 through a [Goliath async webserver](https://github.com/postrank-labs/goliath).
 
@@ -18,3 +20,33 @@ Reasons:
       Goliath::Rack::AsyncAroundware auth_and_rate_limit.rb
       implementation, which now looks to have been replaced by
       Goliath::Rack::BarrierAroundwareFactory.
+
+# Setup
+
+## Setup Database
+
+This sets up gmp_development with a simple 'partners' table, with a key of "a"
+
+`
+% cd bin
+% bash setup_db.sh
+% bundle install
+`
+
+## Run server
+
+`
+% bundle exec ruby mongo_pg.rb -sv
+`
+
+### forwarding example
+
+`
+% curl -v 'http://localhost:9000/horoscope?app=a&birthdate=1971-10-09&oauth_signature=t6tKUGaEV0Rv7EYI2FbMDiLQ5MU%3D'
+`
+
+### missing key example
+
+`
+% curl -v 'http://localhost:9000/horoscope?app=b
+`
