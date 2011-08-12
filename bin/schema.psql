@@ -1,0 +1,74 @@
+--
+-- Name: partners; Type: TABLE; Schema: public; Owner: chub; Tablespace: 
+--
+
+CREATE TABLE partners (
+    id integer NOT NULL,
+    key character varying(255) NOT NULL,
+    secret character varying(255) NOT NULL,
+    url character varying(255) NOT NULL,
+    name character varying(255) NOT NULL,
+    description character varying(255),
+    contact_name character varying(255),
+    email character varying(255),
+    phone character varying(255),
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone
+);
+
+
+ALTER TABLE public.partners OWNER TO chub;
+
+--
+-- Name: partners_id_seq; Type: SEQUENCE; Schema: public; Owner: chub
+--
+
+CREATE SEQUENCE partners_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.partners_id_seq OWNER TO chub;
+
+--
+-- Name: partners_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: chub
+--
+
+ALTER SEQUENCE partners_id_seq OWNED BY partners.id;
+
+
+--
+-- Name: id; Type: DEFAULT; Schema: public; Owner: chub
+--
+
+ALTER TABLE partners ALTER COLUMN id SET DEFAULT nextval('partners_id_seq'::regclass);
+
+--
+-- Data for Name: partners; Type: TABLE DATA; Schema: public; Owner: chub
+--
+
+COPY partners (id, key, secret, url, name, description, contact_name, email, phone, created_at, updated_at) FROM stdin;
+4	a	b	localhost	test	\N	\N	\N	\N	\N	\N
+\.
+
+--
+-- Name: partners_pkey; Type: CONSTRAINT; Schema: public; Owner: chub; Tablespace: 
+--
+
+ALTER TABLE ONLY partners
+    ADD CONSTRAINT partners_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: index_partners_on_key; Type: INDEX; Schema: public; Owner: chub; Tablespace: 
+--
+
+CREATE UNIQUE INDEX index_partners_on_key ON partners USING btree (key);
+
+
+--
+-- PostgreSQL database dump complete
+--
