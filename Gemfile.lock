@@ -1,20 +1,20 @@
 GIT
   remote: git@github.com:bruchu/em-postgresql-adapter.git
-  revision: 65bd79e5a6cdc416262140c35d902afd080582e5
+  revision: 5f15cabb787df40e092d80d03847d11176b097fd
   specs:
     em-postgresql-adapter (0.1)
       pg (>= 0.8.0)
 
 GIT
   remote: https://github.com/igrigorik/em-synchrony.git
-  revision: 70fede9b7ccdc4e6c8f8cce4f246c0ced53d806e
+  revision: f9047648f541959ce89b88052c9a337fe707c995
   specs:
     em-synchrony (0.3.0.beta.1)
       eventmachine (>= 1.0.0.beta.1)
 
 GIT
   remote: https://github.com/postrank-labs/goliath.git
-  revision: 50fcd4d2600c4a124ca4b89a19ca9a449d72b9a6
+  revision: 8af13667dd4ce6b44fbb6792d74923443b44be17
   specs:
     goliath (0.9.2)
       async-rack
@@ -63,7 +63,7 @@ GEM
       eventmachine
     eventmachine (1.0.0.beta.3)
     http_parser.rb (0.5.1)
-    http_router (0.9.6)
+    http_router (0.9.7)
       rack (>= 1.0.0)
       url_mount (~> 0.2.1)
     i18n (0.5.0)

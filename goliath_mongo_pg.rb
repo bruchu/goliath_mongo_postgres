@@ -1,8 +1,11 @@
 #!/usr/bin/env ruby
 #
 # Simple example that takes all requests and forwards them to
-# another API using EM-HTTP-Request. Information about the
-# request and response is then stored into a Mongo database.
+# another API using EM-HTTP-Request.
+#
+# Based on the examples:
+# - https://github.com/postrank-labs/goliath/blob/master/examples/http_log.rb
+# - https://github.com/postrank-labs/goliath/blob/master/examples/auth_and_rate_limit.rb
 #
 
 $: << "./config"
@@ -11,7 +14,6 @@ require 'setup_load_paths'
 
 $: << "../lib" << "./lib"
 
-#require 'rubygems'
 require 'goliath'
 require 'em-mongo'
 require 'em-synchrony/em-http'
@@ -26,42 +28,13 @@ require "eventmachine"
 require "fiber"
 require 'active_record'
 
-require 'zambosa_signature'
-
 class Partner < ActiveRecord::Base
 end
 
-# class AuthAndRateLimitReceiver < Goliath::Synchrony::MultiReceiver
-
-#   def initialize(env)
-#     @env = env
-#     @pending_queries = 0
-#     @db = env.config[db_name]
-#   end
-  
-#   def pre_process
-
-#     validate_app_key!
-
-#     @env.mongo.find( { :_id => self.usage_id }, :limit => 1 ).limit(1).each do |doc|
-#       self.usage_info = doc if doc
-#     end
-
-#     check_rate_limit!
-#     check_signature!
-#   end
-
-#   def post_process
-
-#   end
-# end
-
-class MongoPg < Goliath::API
+class GoliathMongoPg < Goliath::API
   include Goliath::Validation # errors
 
   use Goliath::Rack::Params
-
-  #use Goliath::Rack::AsyncAroundware, AuthAndRateLimitReceiver, env
 
   TIMEBIN_SIZE = 60 * 60
   DEFAULT_RATE_LIMIT = 25
@@ -83,12 +56,6 @@ class MongoPg < Goliath::API
     self.const_set(klass_name, klass)
   end
     
-  # class MissingApikeyError < BadRequestError
-  #   def initialize
-  #     super("missing api key")
-  #   end
-  # end
-
   attr_accessor :usage_info, :partner
 
   def on_headers(env, headers)
@@ -143,7 +110,6 @@ class MongoPg < Goliath::API
     else
       charge_forwarder_failure
     end
-
     [resp.response_header.status, response_headers, resp.response]
   end
 
@@ -153,7 +119,7 @@ class MongoPg < Goliath::API
     k.downcase.split('_').collect { |e| e.capitalize }.join('-')
   end
 
-  # Write the request information into mongo
+  # Echo the request information to stdout
   def record(env, process_time, resp, client_headers, response_headers)
     e = env
     EM.next_tick do
@@ -198,12 +164,6 @@ class MongoPg < Goliath::API
     unless self.partner.secret
       raise InvalidApikeyError
     end
-
-    puts 'url=%s' % "http://#{ env.HTTP_HOST.downcase }#{ env.REQUEST_URI }"
-    unless ZambosaSignature.verify_url(self.partner.key, self.partner.secret, "http://#{ env.HTTP_HOST.downcase }#{ env.REQUEST_URI }")
-      charge_invalid_signature
-      raise InvalidSignatureError
-    end
   end
 
   def check_rate_limit!
@@ -220,10 +180,6 @@ class MongoPg < Goliath::API
 
   def charge_usage
     charge(:calls => 1)
-  end
-
-  def charge_invalid_signature
-    charge(:invalid_signature => 1)
   end
 
   def charge_overlimit
@@ -248,7 +204,6 @@ class MongoPg < Goliath::API
   # ===========================================================================
 
   def usage_id
-    #puts "#{ self.partner.id }-#{timebin}"
     "#{ self.partner.id }-#{timebin}"
   end
 
